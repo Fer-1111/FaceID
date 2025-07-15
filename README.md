@@ -1,140 +1,262 @@
+# Sistema de Reconocimiento Facial y Detección de Emociones
 
-Reconocimiento Facial en Tiempo Real
-Sistema de reconocimiento facial en tiempo real usando OpenCV y DeepFace con capacidades de registro y detección automática.
+**Proyecto académico desarrollado para el curso de Inteligencia Artificial**  
+**Universidad de Concepción - 2025**
 
-🚀 Características
+Sistema integral de reconocimiento facial y análisis de emociones en tiempo real con múltiples implementaciones que demuestran diferentes enfoques tecnológicos, desde algoritmos heurísticos hasta redes neuronales profundas.
 
-Detección en tiempo real - Reconoce caras instantáneamente desde la cámara
-Registro de nuevas caras - Agrega personas a la base de datos fácilmente
-Modo dual - Funciona con DeepFace (completo) o modo básico (solo detección)
-Interfaz visual - Muestra nombres y confianza sobre las caras detectadas
-Base de datos local - Almacena información de personas registradas
-Rendimiento optimizado - Procesamiento asíncrono para mejor fluidez
+---
 
-📋 Requisitos
+## 🚀 Características Principales
 
-Python 3.7+
-Cámara web
-Windows/Linux/macOS
+### **Tres implementaciones especializadas:**
+- **MediaPipe** - Detección rápida y eficiente con landmarks faciales
+- **OpenCV + FER** - Balance óptimo entre precisión y rendimiento
+- **DeepFace Integrado** - Sistema completo con reconocimiento de identidades
 
-🛠️ Instalación
+### **Funcionalidades avanzadas:**
+- ✨ **Detección en tiempo real** - Reconoce caras y emociones instantáneamente
+- 🎭 **7 emociones básicas** - Felicidad, tristeza, ira, miedo, sorpresa, disgusto, neutral
+- 👤 **Registro de identidades** - Base de datos local de personas conocidas
+- 🔄 **Modo dual** - Funciona con IA completa o modo básico de respaldo
+- 📊 **Tracking temporal** - Seguimiento de patrones emocionales por persona
+- 💾 **Persistencia de datos** - Almacenamiento automático de sesiones
+- 🎯 **Sistema de calidad** - Métricas de confiabilidad en tiempo real
 
-Clona el repositorio
+---
 
-bashgit clone https://github.com/tu-usuario/face-recognition-realtime.git
-cd face-recognition-realtime
+## 📋 Requisitos del Sistema
 
-Instala las dependencias
+### **Software base:**
+- Python 3.7+
+- Cámara web
+- Windows/Linux/macOS
 
-bashpip install opencv-python numpy deepface
-O usando requirements.txt:
-bashpip install -r requirements.txt
+### **Especificaciones recomendadas:**
+| Implementación | RAM | CPU | GPU | Almacenamiento |
+|---|---|---|---|---|
+| **MediaPipe** | 4GB | Multi-core | Opcional | 500MB |
+| **OpenCV + FER** | 8GB | Multi-core | Recomendada | 2GB |
+| **DeepFace** | 16GB | Multi-core | Preferible | 5GB |
 
-Ejecuta el programa
+---
 
-bashpython face_recognition.py
-🎮 Uso
-Controles básicos:
+## 🛠️ Instalación
 
-'q' - Salir del programa
-'r' - Registrar nueva cara (modo DeepFace)
-'i' - Mostrar información del sistema
-'Espacio' - Capturar foto durante registro
+### **1. Clonar el repositorio**
+```bash
+git clone https://github.com/tu-usuario/facial-emotion-recognition.git
+cd facial-emotion-recognition
+```
 
-Primer uso:
+### **2. Crear entorno virtual (recomendado)**
+```bash
+python -m venv venv
 
-Ejecuta el programa
-Presiona 'r' para registrar una nueva cara
-Ingresa el nombre de la persona
-Posiciónate frente a la cámara
-Presiona 'Espacio' para capturar
-¡La persona queda registrada!
+# Windows
+venv\Scripts\activate
 
-📁 Estructura del proyecto
-face-recognition-realtime/
-├── face_recognition.py      # Código principal
-├── requirements.txt         # Dependencias
-├── README.md               # Este archivo
-├── mi_base_de_datos/       # Base de datos (se crea automáticamente)
-│   ├── known_faces.json    # Información de caras registradas
-│   └── *.jpg              # Imágenes de caras registradas
-└── .gitignore             # Archivos ignorados por git
-⚙️ Configuración
-Variables principales:
+# Linux/macOS
+source venv/bin/activate
+```
 
-recognition_threshold: Umbral de confianza (0.6 por defecto)
-frame_skip: Frames a saltar para mejor rendimiento (3 por defecto)
-database_path: Carpeta de la base de datos
+### **3. Instalar dependencias**
 
-Personalización:
-python# En la clase RealTimeFaceRecognition
-recognizer = RealTimeFaceRecognition(
-    database_path="mi_base_de_datos",
-    recognition_threshold=0.6,
-    frame_skip=3
-)
-🔧 Modos de funcionamiento
-Modo completo (con DeepFace):
+#### **Instalación básica (todas las implementaciones):**
+```bash
+pip install opencv-python numpy mediapipe fer tensorflow deepface
+```
 
-Reconocimiento facial completo
-Registro de nuevas caras
-Análisis de confianza
-Comparación con base de datos
+#### **O usar requirements.txt:**
+```bash
+pip install -r requirements.txt
+```
 
-Modo básico (sin DeepFace):
+#### **Instalación por módulos (opcional):**
+```bash
+# Solo MediaPipe
+pip install opencv-python numpy mediapipe
 
-Solo detección de caras
-Sin reconocimiento de identidad
-Funciona como respaldo
+# Solo OpenCV + FER
+pip install opencv-python numpy fer tensorflow
 
-🐛 Solución de problemas
-DeepFace no se instala:
-bashpip install tensorflow
+# Solo DeepFace
+pip install opencv-python numpy deepface tensorflow
+```
+
+### **4. Verificar instalación**
+```bash
+python test_deepface.py
+```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+facial-emotion-recognition/
+├── 📄 mediaPipe.py              # Implementación MediaPipe
+├── 📄 opencv_emotion.py         # Implementación OpenCV + FER
+├── 📄 deepFace.py              # Implementación DeepFace integrada
+├── 📄 reconocimiento_facial.py  # Sistema de reconocimiento básico
+├── 📄 test_deepface.py          # Verificación de dependencias
+├── 📄 requirements.txt          # Lista de dependencias
+├── 📄 README.md                # Este archivo
+├── 📁 mi_base_de_datos/        # Base de datos (se crea automáticamente)
+│   ├── 📄 known_faces.json     # Información de identidades
+│   ├── 📷 *.jpg               # Imágenes de referencia
+│   └── 📊 session_*.json      # Datos de sesiones
+├── 📁 emotion_data/           # Datos de emociones (MediaPipe/FER)
+└── 📄 .gitignore             # Archivos ignorados
+```
+
+## 🎮 Guías de Uso
+
+### **MediaPipe - Detección Rápida**
+```bash
+python mediaPipe.py
+```
+**Controles:**
+- `l` - Activar/desactivar landmarks
+- `f` - Mostrar/ocultar características
+- `b` - Barras de confianza
+- `r` - Reset estadísticas
+- `s` - Guardar datos
+- `1-7` - Calibración rápida de emociones
+- `q` - Salir
+
+### **OpenCV + FER - Precisión Equilibrada**
+```bash
+python opencv_emotion.py
+```
+**Controles:**
+- `s` - Guardar sesión
+- `i` - Información detallada
+- `r` - Resetear estadísticas
+- `+/-` - Ajustar velocidad de procesamiento
+- `q` - Salir
+
+### **DeepFace - Sistema Completo**
+```bash
+python deepFace.py
+```
+**Controles:**
+- `r` - Registrar nueva persona
+- `Espacio` - Capturar durante registro
+- `i` - Información del sistema
+- `s` - Guardar datos de sesión
+- `h` - Mostrar/ocultar estadísticas
+- `q` - Salir
+
+### **Primer uso del sistema DeepFace:**
+1. Ejecuta `python deepFace.py`
+2. Presiona `r` para registrar
+3. Ingresa el nombre de la persona
+4. Posiciónate frente a la cámara
+5. Presiona `Espacio` para capturar
+6. ¡La persona queda registrada!
+
+---
+
+## ⚙️ Configuración Avanzada
+
+### **Variables principales del sistema:**
+```python
+# En cada implementación puedes ajustar:
+recognition_threshold = 0.6      # Umbral de confianza
+frame_skip = 3                   # Frames a procesar
+database_path = "mi_base_de_datos"  # Carpeta de datos
+confidence_threshold = 0.3       # Confianza mínima
+stabilization_frames = 8         # Frames para estabilización
+```
+
+### **Personalización de MediaPipe:**
+```python
+recognizer = ImprovedMediaPipeEmotionRecognition(save_data=True)
+recognizer.process_every_n_frames = 2  # Más velocidad
+recognizer.stabilization_frames = 15   # Más estabilidad
+```
+
+### **Personalización de FER:**
+```python
+recognizer = ImprovedEmotionRecognition(save_data=True)
+recognizer.confidence_threshold = 0.5  # Más restrictivo
+recognizer.min_face_size = (60, 60)    # Caras más grandes
+```
+
+### **Personalización de DeepFace:**
+```python
+recognizer = EnhancedFaceEmotionRecognition("mi_db")
+recognizer.recognition_threshold = 0.7  # Más precisión
+recognizer.frame_skip = 2              # Más velocidad
+```
+
+## 🐛 Solución de Problemas
+
+### **DeepFace no se instala:**
+```bash
+# Instalar TensorFlow primero
+pip install tensorflow==2.11.0
 pip install deepface
-Cámara no detectada:
 
-Verifica que la cámara esté conectada
-Permite acceso a la cámara en configuración del sistema
-Prueba cambiar el índice de cámara en el código
+# Si persiste el error
+pip install --upgrade pip
+pip install deepface --no-cache-dir
+```
 
-Problemas de rendimiento:
+### **Error de cámara:**
+- Verifica que la cámara esté conectada
+- Permite acceso a la cámara en configuración del sistema
+- Prueba cambiar el índice: `cv2.VideoCapture(1)` en lugar de `(0)`
+- Cierra otras aplicaciones que usen la cámara
 
-Aumenta frame_skip para mejor FPS
-Reduce resolución de cámara
-Cierra otras aplicaciones que usen la cámara
+### **Problemas de rendimiento:**
+```python
+# Aumentar frame_skip para mejor FPS
+frame_skip = 5  # Procesar cada 5 frames
 
-📊 Tecnologías utilizadas
+# Reducir resolución
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
-OpenCV - Captura de video y detección de caras
-DeepFace - Reconocimiento facial con IA
-NumPy - Procesamiento de arrays
-Threading - Procesamiento asíncrono
-JSON - Almacenamiento de datos
+# Cerrar aplicaciones pesadas
+```
 
-🤝 Contribuir
+### **MediaPipe no funciona:**
+```bash
+pip uninstall mediapipe
+pip install mediapipe --no-cache-dir
+```
 
-Fork el proyecto
-Crea una rama para tu feature (git checkout -b feature/nueva-caracteristica)
-Commit tus cambios (git commit -m 'Agregar nueva característica')
-Push a la rama (git push origin feature/nueva-caracteristica)
-Abre un Pull Request
+### **FER da errores:**
+```bash
+pip install fer==22.5.1
+pip install tensorflow==2.11.0
+```
 
-📝 Licencia
-Este proyecto está bajo la Licencia MIT - ver el archivo LICENSE para más detalles.
-🎯 Roadmap
+### **Errores de memoria:**
+- Reduce `buffer_size` en las configuraciones
+- Aumenta `frame_skip`
+- Cierra otras aplicaciones
+- Considera usar solo una implementación a la vez
 
- Reconocimiento de emociones
- Detección de edad y género
- Interfaz web con Flask
- Base de datos SQLite
- Reconocimiento múltiple simultáneo
- Exportar reportes
- Integración con APIs
 
-👨‍💻 Autor
-Fernando - GitHub
-🙏 Agradecimientos
+### **Algoritmos implementados:**
+- Redes Neuronales Convolucionales (CNN)
+- Algoritmos heurísticos personalizados
+- Análisis de landmarks faciales
+- Métricas de distancia (coseno, euclidiana)
+- Filtros de estabilización temporal
 
-OpenCV community
-DeepFace developers
-Contribuidores del proyecto
+### **Versión actual (v1.0):**
+- ✅ Tres implementaciones funcionales
+- ✅ Reconocimiento facial básico
+- ✅ Detección de 7 emociones
+- ✅ Sistema de tracking
+- ✅ Base de datos local
+
+### **Documentación técnica:**
+- [MediaPipe Documentation](https://mediapipe.dev/)
+- [DeepFace GitHub](https://github.com/serengil/deepface)
+- [OpenCV Documentation](https://opencv.org/)
+- [TensorFlow Guides](https://tensorflow.org/)
