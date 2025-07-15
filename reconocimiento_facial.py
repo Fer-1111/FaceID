@@ -41,11 +41,14 @@ class RealTimeFaceRecognition:
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         self.recognition_threshold = 0.6
         self.frame_skip = 3  # Procesar cada 3 frames para mejor rendimiento
+        self.emotion_frame_skip = 15  # Procesar emociones cada 15 frames (menos frecuente)
         self.frame_count = 0
         
         # Para procesamiento en hilo separado
         self.frame_queue = queue.Queue(maxsize=2)
         self.result_queue = queue.Queue(maxsize=2)
+        self.emotion_queue = queue.Queue(maxsize=2)
+        self.emotion_result_queue = queue.Queue(maxsize=2)
         self.processing_lock = Lock()
         self.is_processing = False
         
@@ -54,6 +57,28 @@ class RealTimeFaceRecognition:
             os.makedirs(self.database_path)
             
         self.load_known_faces()
+        
+        # Diccionario para mapear emociones a emojis
+        self.emotion_emojis = {
+            'angry': '😠',
+            'disgust': '🤢',
+            'fear': '😨',
+            'happy': '😊',
+            'sad': '😢',
+            'surprise': '😮',
+            'neutral': '😐'
+        }
+        
+        # Colores para cada emoción
+        self.emotion_colors = {
+            'angry': (0, 0, 255),      # Rojo
+            'disgust': (0, 128, 0),    # Verde oscuro
+            'fear': (128, 0, 128),     # Púrpura
+            'happy': (0, 255, 255),    # Amarillo
+            'sad': (255, 0, 0),        # Azul
+            'surprise': (255, 165, 0), # Naranja
+            'neutral': (192, 192, 192) # Gris
+        }
     
     def load_known_faces(self):
         """Carga la información de caras conocidas desde archivo JSON"""
@@ -104,6 +129,11 @@ class RealTimeFaceRecognition:
         if not self.frame_queue.full():
             self.frame_queue.put(frame.copy())
     
+    def analyze_emotions_async(self, frame):
+        """Procesamiento asíncrono de análisis de emociones"""
+        if not self.emotion_queue.full():
+            self.emotion_queue.put(frame.copy())
+    
     def process_recognition_worker(self):
         """Worker thread para procesamiento de reconocimiento"""
         while True:
@@ -126,11 +156,76 @@ class RealTimeFaceRecognition:
                         with self.processing_lock:
                             self.is_processing = False
                 
-                time.sleep(0.1)  # Pequeña pausa para evitar uso excesivo de CPU
+                time.sleep(0.1)
                 
             except Exception as e:
                 print(f"Error en worker thread: {e}")
                 time.sleep(1)
+    
+    def process_emotion_worker(self):
+        """Worker thread para procesamiento de emociones"""
+        while True:
+            try:
+                if not self.emotion_queue.empty():
+                    frame = self.emotion_queue.get()
+                    
+                    try:
+                        emotions = self.analyze_emotions(frame)
+                        if not self.emotion_result_queue.full():
+                            self.emotion_result_queue.put(emotions)
+                    except Exception as e:
+                        print(f"Error en análisis de emociones: {e}")
+                
+                time.sleep(0.2)
+                
+            except Exception as e:
+                print(f"Error en emotion worker thread: {e}")
+                time.sleep(1)
+    
+    def analyze_emotions(self, frame):
+        """
+        Analiza las emociones en el frame usando DeepFace
+        
+        Args:
+            frame: Frame de la cámara
+            
+        Returns:
+            Lista con información de emociones detectadas
+        """
+        if not DEEPFACE_AVAILABLE:
+            return []
+        
+        try:
+            # Usar DeepFace para análisis de emociones
+            results = DeepFace.analyze(
+                frame, 
+                actions=['emotion', 'age', 'gender'], 
+                enforce_detection=False, 
+                silent=True
+            )
+            
+            # DeepFace puede retornar una lista o un dict
+            if not isinstance(results, list):
+                results = [results]
+            
+            emotions_data = []
+            for result in results:
+                if 'region' in result:
+                    x, y, w, h = result['region']['x'], result['region']['y'], result['region']['w'], result['region']['h']
+                    
+                    emotions_data.append({
+                        'bbox': (x, y, w, h),
+                        'emotion': result['dominant_emotion'],
+                        'age': result.get('age', 'N/A'),
+                        'gender': result.get('dominant_gender', 'N/A'),
+                        'emotion_scores': result.get('emotion', {})
+                    })
+            
+            return emotions_data
+            
+        except Exception as e:
+            print(f"Error en análisis de emociones: {e}")
+            return []
     
     def recognize_faces(self, frame):
         """
@@ -146,18 +241,16 @@ class RealTimeFaceRecognition:
             return []
         
         if not DEEPFACE_AVAILABLE:
-            # Modo de respaldo sin DeepFace
             return self.recognize_faces_fallback(frame)
         
         results = []
         
         try:
-            # Detectar caras usando Haar Cascade (más rápido para detección inicial)
+            # Detectar caras usando Haar Cascade
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
             
             for (x, y, w, h) in faces:
-                # Extraer región de la cara
                 face_region = frame[y:y+h, x:x+w]
                 
                 if face_region.size == 0:
@@ -169,7 +262,6 @@ class RealTimeFaceRecognition:
                 # Comparar con cada cara conocida
                 for name, face_info in self.known_faces.items():
                     try:
-                        # Usar DeepFace para verificación
                         result = DeepFace.verify(
                             img1_path=face_region,
                             img2_path=face_info["image_path"],
@@ -185,7 +277,6 @@ class RealTimeFaceRecognition:
                     except Exception as e:
                         continue
                 
-                # Agregar resultado
                 confidence = max(0, (1 - min_distance) * 100) if best_match else 0
                 results.append({
                     "bbox": (x, y, w, h),
@@ -199,10 +290,7 @@ class RealTimeFaceRecognition:
         return results
     
     def recognize_faces_fallback(self, frame):
-        """
-        Modo de respaldo para reconocimiento cuando DeepFace no está disponible
-        Usa solo detección de caras con Haar Cascade
-        """
+        """Modo de respaldo para reconocimiento cuando DeepFace no está disponible"""
         results = []
         
         try:
@@ -221,15 +309,17 @@ class RealTimeFaceRecognition:
         
         return results
     
-    def draw_results(self, frame, results):
+    def draw_results(self, frame, face_results, emotion_results):
         """
-        Dibuja los resultados del reconocimiento en el frame
+        Dibuja los resultados del reconocimiento y emociones en el frame
         
         Args:
             frame: Frame de la cámara
-            results: Resultados del reconocimiento
+            face_results: Resultados del reconocimiento facial
+            emotion_results: Resultados del análisis de emociones
         """
-        for result in results:
+        # Dibujar reconocimiento facial
+        for result in face_results:
             x, y, w, h = result["bbox"]
             name = result["name"]
             confidence = result["confidence"]
@@ -242,40 +332,74 @@ class RealTimeFaceRecognition:
                 color = (0, 0, 255)  # Rojo para desconocidos
                 label = "Desconocido"
             
-            # Dibujar rectángulo
+            # Dibujar rectángulo principal
             cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
             
             # Dibujar etiqueta con fondo
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
             cv2.rectangle(frame, (x, y-30), (x + label_size[0], y), color, -1)
             cv2.putText(frame, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Dibujar análisis de emociones
+        for emotion_data in emotion_results:
+            x, y, w, h = emotion_data['bbox']
+            emotion = emotion_data['emotion']
+            age = emotion_data['age']
+            gender = emotion_data['gender']
+            
+            # Obtener emoji y color para la emoción
+            emoji = self.emotion_emojis.get(emotion, '😐')
+            emotion_color = self.emotion_colors.get(emotion, (255, 255, 255))
+            
+            # Dibujar rectángulo para emociones (más delgado)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), emotion_color, 1)
+            
+            # Preparar texto de emoción
+            emotion_text = f"{emoji} {emotion.capitalize()}"
+            info_text = f"{age} años, {gender}"
+            
+            # Dibujar información de emoción
+            emotion_size = cv2.getTextSize(emotion_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+            info_size = cv2.getTextSize(info_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
+            
+            # Fondo para texto de emoción
+            cv2.rectangle(frame, (x, y+h), (x + max(emotion_size[0], info_size[0]), y+h+35), emotion_color, -1)
+            
+            # Texto de emoción
+            cv2.putText(frame, emotion_text, (x, y+h+15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            cv2.putText(frame, info_text, (x, y+h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
     
     def run_real_time_recognition(self):
-        """Ejecuta el reconocimiento facial en tiempo real"""
+        """Ejecuta el reconocimiento facial y análisis de emociones en tiempo real"""
         if not DEEPFACE_AVAILABLE:
             print("⚠️  DeepFace no está disponible. Ejecutando en modo de detección básica.")
-            print("   Solo se detectarán caras, pero no se reconocerán personas específicas.")
-            print("   Para reconocimiento completo, soluciona el problema de instalación de DeepFace.")
+            print("   Solo se detectarán caras, pero no se reconocerán personas específicas ni emociones.")
+            print("   Para funcionalidad completa, soluciona el problema de instalación de DeepFace.")
         
-        print("🎥 Iniciando reconocimiento facial en tiempo real...")
+        print("🎥 Iniciando reconocimiento facial y análisis de emociones en tiempo real...")
         print("Controles:")
         if DEEPFACE_AVAILABLE:
             print("  'r' + Enter: Registrar nueva cara")
+        print("  'e': Activar/desactivar análisis de emociones")
         print("  'q': Salir")
         print("  'i': Mostrar información")
         
-        # Iniciar worker thread solo si DeepFace está disponible
+        # Iniciar worker threads solo si DeepFace está disponible
         if DEEPFACE_AVAILABLE:
-            worker_thread = Thread(target=self.process_recognition_worker, daemon=True)
-            worker_thread.start()
+            recognition_worker = Thread(target=self.process_recognition_worker, daemon=True)
+            emotion_worker = Thread(target=self.process_emotion_worker, daemon=True)
+            recognition_worker.start()
+            emotion_worker.start()
         
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         cap.set(cv2.CAP_PROP_FPS, 30)
         
-        last_results = []
+        last_face_results = []
+        last_emotion_results = []
         registration_mode = False
+        emotion_analysis_enabled = True
         
         while True:
             ret, frame = cap.read()
@@ -289,24 +413,34 @@ class RealTimeFaceRecognition:
             self.frame_count += 1
             
             if DEEPFACE_AVAILABLE:
-                # Procesar reconocimiento cada ciertos frames
+                # Procesar reconocimiento facial
                 if self.frame_count % self.frame_skip == 0:
                     self.recognize_face_async(frame)
                 
+                # Procesar análisis de emociones (menos frecuente)
+                if emotion_analysis_enabled and self.frame_count % self.emotion_frame_skip == 0:
+                    self.analyze_emotions_async(frame)
+                
                 # Obtener últimos resultados disponibles
                 if not self.result_queue.empty():
-                    last_results = self.result_queue.get()
+                    last_face_results = self.result_queue.get()
+                
+                if not self.emotion_result_queue.empty():
+                    last_emotion_results = self.emotion_result_queue.get()
             else:
                 # Modo básico sin DeepFace
                 if self.frame_count % self.frame_skip == 0:
-                    last_results = self.recognize_faces_fallback(frame)
+                    last_face_results = self.recognize_faces_fallback(frame)
+                    last_emotion_results = []
             
             # Dibujar resultados
-            self.draw_results(frame, last_results)
+            emotion_results_to_show = last_emotion_results if emotion_analysis_enabled else []
+            self.draw_results(frame, last_face_results, emotion_results_to_show)
             
             # Mostrar información del sistema
             mode_text = "DeepFace" if DEEPFACE_AVAILABLE else "Básico"
-            info_text = f"Modo: {mode_text} | Caras conocidas: {len(self.known_faces)} | FPS: ~{30//self.frame_skip}"
+            emotion_status = "ON" if emotion_analysis_enabled and DEEPFACE_AVAILABLE else "OFF"
+            info_text = f"Modo: {mode_text} | Emociones: {emotion_status} | Caras: {len(self.known_faces)}"
             cv2.putText(frame, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
             if registration_mode and DEEPFACE_AVAILABLE:
@@ -316,8 +450,17 @@ class RealTimeFaceRecognition:
                 cv2.putText(frame, "DETECCION BASICA - DeepFace no disponible", (10, 60), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
             
+            # Mostrar leyenda de emociones
+            if emotion_analysis_enabled and DEEPFACE_AVAILABLE:
+                y_offset = frame.shape[0] - 120
+                cv2.putText(frame, "Emociones:", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                for i, (emotion, emoji) in enumerate(self.emotion_emojis.items()):
+                    y_pos = y_offset + 15 + (i * 12)
+                    color = self.emotion_colors.get(emotion, (255, 255, 255))
+                    cv2.putText(frame, f"{emoji} {emotion}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.3, color, 1)
+            
             # Mostrar frame
-            cv2.imshow('Reconocimiento Facial en Tiempo Real', frame)
+            cv2.imshow('Reconocimiento Facial con Análisis de Emociones', frame)
             
             # Manejar teclas
             key = cv2.waitKey(1) & 0xFF
@@ -337,20 +480,26 @@ class RealTimeFaceRecognition:
                         print(f"✅ {name} registrado exitosamente!")
                     registration_mode = False
                     del name
+            elif key == ord('e'):
+                emotion_analysis_enabled = not emotion_analysis_enabled
+                status = "activado" if emotion_analysis_enabled else "desactivado"
+                print(f"🎭 Análisis de emociones {status}")
             elif key == ord('i'):
                 print(f"\n📊 Información del sistema:")
                 print(f"   DeepFace disponible: {'Sí' if DEEPFACE_AVAILABLE else 'No'}")
+                print(f"   Análisis de emociones: {'Activado' if emotion_analysis_enabled else 'Desactivado'}")
                 print(f"   Caras registradas: {len(self.known_faces)}")
                 for name in self.known_faces.keys():
                     print(f"   - {name}")
+                print(f"   Emociones detectables: {', '.join(self.emotion_emojis.keys())}")
         
         cap.release()
         cv2.destroyAllWindows()
-        print("👋 Reconocimiento facial finalizado")
+        print("👋 Reconocimiento facial y análisis de emociones finalizado")
 
 def main():
     """Función principal"""
-    print("🚀 Iniciando sistema de reconocimiento facial...")
+    print("🚀 Iniciando sistema de reconocimiento facial con análisis de emociones...")
     
     recognizer = RealTimeFaceRecognition("mi_base_de_datos")
     
