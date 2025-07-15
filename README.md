@@ -1,7 +1,6 @@
 # Sistema de Reconocimiento Facial y Detección de Emociones
 
-**Proyecto académico desarrollado para el curso de Inteligencia Artificial**  
-**Universidad de Concepción - 2025**
+**Proyecto para Inteligencia Artificial**  
 
 Sistema integral de reconocimiento facial y análisis de emociones en tiempo real con múltiples implementaciones que demuestran diferentes enfoques tecnológicos, desde algoritmos heurísticos hasta redes neuronales profundas.
 
